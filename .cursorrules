@@ -1,0 +1,70 @@
+{
+  "rules": {
+    "naming-conventions": {
+      "type": "IProps",
+      "function": "camelCase",
+      "variable": "camelCase",
+      "constant": "UPPER_CASE",
+      "filename": "PascalCase",
+      "foldername": "camelCase",
+      "module": "PascalCase",
+      "interface-prefix": "I"
+    },
+    "styling": {
+      "use": "css-modules",
+      "framework": "none",
+      "design-match": "https://allyoucanlearn.nl/",
+      "global-styles": false,
+      "allowed-css-features": "all",
+      "disallow-inline-styles": true
+    },
+    "structure": {
+      "logic-location": "src/views/[AViewName].tsx",
+      "modules": {
+        "path": "src/modules/[ModuleName]",
+        "subdirectories": ["components", "hooks", "types", "utils", "services"],
+        "enforce-structure": true
+      },
+      "no-page-logic": true,
+      "barrel-files": {
+        "enforce": true,
+        "allowed": ["index.ts"]
+      }
+    },
+    "libraries": {
+      "allow": [],
+      "disallow": ["tailwind", "shadcn", "framer-motion"],
+      "state-management": ["useState", "useReducer", "useContext"],
+      "http-client": "fetch",
+      "form-handling": "none"
+    },
+    "typescript": {
+      "use-types": true,
+      "type-naming": "IProps",
+      "allow-interfaces": {
+        "only-if-extending": true
+      },
+      "strict-mode": true,
+      "type-safety": "always"
+    },
+    "performance": {
+      "enterprise-code": true,
+      "free-only": true,
+      "optimize-images": "next/image",
+      "lazy-loading": "components-only",
+      "code-splitting": "dynamic-imports",
+      "tree-shaking": true
+    },
+    "security": {
+      "sanitize-user-input": true,
+      "escape-html": true,
+      "prevent-xss": true,
+      "disable-eval": true
+    },
+    "accessibility": {
+      "aria-compliance": "strict",
+      "color-contrast": "AA",
+      "keyboard-navigation": "required"
+    }
+  }
+}
