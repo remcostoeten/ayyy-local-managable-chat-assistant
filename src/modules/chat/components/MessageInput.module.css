@@ -1,0 +1,49 @@
+.inputForm {
+    display: flex;
+    padding: 12px;
+    border-top: 1px solid #eaeaea;
+    background-color: white;
+}
+
+.inputField {
+    flex: 1;
+    padding: 12px 16px;
+    border: 1px solid #e0e0e0;
+    border-radius: 24px;
+    font-size: 14px;
+    outline: none;
+    transition: border-color 0.2s;
+}
+
+.inputField:focus {
+    border-color: #5a17ce;
+}
+
+.inputField:disabled {
+    background-color: #f9f9f9;
+    cursor: not-allowed;
+}
+
+.sendButton {
+    width: 40px;
+    height: 40px;
+    margin-left: 8px;
+    background-color: #5a17ce;
+    color: white;
+    border: none;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: background-color 0.2s;
+}
+
+.sendButton:hover:not(:disabled) {
+    background-color: #4a14a8;
+}
+
+.sendButton:disabled {
+    background-color: #c8c8c8;
+    cursor: not-allowed;
+}
