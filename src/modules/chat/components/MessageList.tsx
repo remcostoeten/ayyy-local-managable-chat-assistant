@@ -3,13 +3,14 @@ import Message from "./Message"
 import styles from "./MessageList.module.css"
 
 interface IMessageListProps {
-    messages: IChatMessage[]
+    messages: IChatMessage[];
+    onFeedback?: (messageId: string, isHelpful: boolean, comment?: string) => void;
 }
 
-const MessageList = ({ messages }: IMessageListProps) => {
+const MessageList = ({ messages, onFeedback }: IMessageListProps) => {
     return (
         <div className={styles.messageList}>
-            {messages.map((message) => (
+            {messages?.map((message) => (
                 <Message key={message.id} message={message} />
             ))}
         </div>

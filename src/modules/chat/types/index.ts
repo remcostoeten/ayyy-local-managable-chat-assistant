@@ -1,8 +1,8 @@
 export interface IChatMessage {
-  id: string
-  content: string
-  role: "user" | "assistant"
-  timestamp: Date
+  id: string;
+  content: string;
+  role: 'user' | 'assistant';
+  timestamp: Date;
 }
 
 export interface ISupportArticle {
