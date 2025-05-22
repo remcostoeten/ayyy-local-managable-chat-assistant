@@ -1,35 +1,99 @@
 import { db } from '@/lib/db/client';
 import { embeddings } from '@/lib/db/schema';
 import { eq } from 'drizzle-orm';
+import { TextSplitter, getOptimalChunkSize } from './text-splitter';
+import { embeddingCache } from './cache';
+import pLimit from 'p-limit';
+import { SQL } from 'drizzle-orm';
 
 const CHUNK_SIZE = 500;
 const CHUNK_OVERLAP = 100;
 const SIMILARITY_THRESHOLD = 0.7;
+const BATCH_SIZE = 10; // Number of embeddings to generate in parallel
+const RETRY_ATTEMPTS = 3;
+const RETRY_DELAY = 1000; // 1 second
 
-export async function generateEmbedding(text: string): Promise<number[]> {
-  try {
-    const response = await fetch("http://localhost:11434/api/embeddings", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        model: "mistral",
-        prompt: text,
-      }),
-    });
-
-    if (!response.ok) {
-      throw new Error(`Failed to generate embedding: ${response.statusText}`);
-    }
-
-    const data = await response.json();
-    return data.embedding;
-  } catch (error) {
-    console.error("Error generating embedding:", error);
-    throw error;
-  }
+interface EmbeddingOptions {
+  modelName?: string;
+  batchSize?: number;
+  retryAttempts?: number;
+  retryDelay?: number;
 }
 
-// Split text into overlapping chunks
+interface EmbeddingRecord {
+  id: number;
+  articleId: number;
+  chunkText: string;
+  chunkIndex: number;
+  vector: string;
+  createdAt: Date;
+}
+
+export async function generateEmbedding(text: string, options: EmbeddingOptions = {}): Promise<number[]> {
+  const cachedEmbedding = embeddingCache.getEmbedding(text);
+  if (cachedEmbedding) {
+    return cachedEmbedding;
+  }
+
+  const {
+    modelName = "mistral",
+    retryAttempts = RETRY_ATTEMPTS,
+    retryDelay = RETRY_DELAY
+  } = options;
+
+  let lastError: Error | null = null;
+
+  for (let attempt = 0; attempt < retryAttempts; attempt++) {
+    try {
+      const response = await fetch("http://localhost:11434/api/embeddings", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          model: modelName,
+          prompt: text,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to generate embedding: ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      if (!data.embedding || !Array.isArray(data.embedding)) {
+        throw new Error('Invalid embedding response format');
+      }
+      
+      // Cache the result
+      embeddingCache.setEmbedding(text, data.embedding);
+      
+      return data.embedding;
+    } catch (error) {
+      lastError = error as Error;
+      if (attempt < retryAttempts - 1) {
+        await new Promise(resolve => setTimeout(resolve, retryDelay));
+      }
+    }
+  }
+
+  throw lastError || new Error('Failed to generate embedding after retries');
+}
+
+export async function generateBulkEmbeddings(
+  texts: string[],
+  options: EmbeddingOptions = {}
+): Promise<number[][]> {
+  const { batchSize = BATCH_SIZE } = options;
+  const limit = pLimit(batchSize);
+  
+  const embeddings = await Promise.all(
+    texts.map(text => 
+      limit(() => generateEmbedding(text, options))
+    )
+  );
+
+  return embeddings;
+}
+
 export function splitIntoChunks(text: string): string[] {
   const chunks: string[] = [];
   let startIndex = 0;
@@ -174,48 +238,97 @@ export function chunkText(text: string): string[] {
   return chunks;
 }
 
-interface EmbeddingRecord {
-  id: number;
-  articleId: number;
-  chunkText: string;
-  chunkIndex: number;
-  vector: string;
-  createdAt: Date;
-  updatedAt: Date;
-}
+export async function storeArticleEmbeddings(
+  articleId: number,
+  content: string,
+  options: EmbeddingOptions = {}
+): Promise<void> {
+  // Create text splitter with optimal chunk size
+  const textSplitter = new TextSplitter(
+    getOptimalChunkSize(4096) // Adjust based on your model's context window
+  );
 
-export async function storeArticleEmbeddings(articleId: number, content: string): Promise<void> {
-  const chunks = splitIntoChunks(content);
+  // Split content into chunks
+  const chunks = textSplitter.splitText(content);
   
-  for (let i = 0; i < chunks.length; i++) {
-    const vector = await generateEmbedding(chunks[i]);
-    await db.insert(embeddings).values({
-      articleId,
-      chunkText: chunks[i],
-      chunkIndex: i,
-      vector: JSON.stringify(vector),
-    });
+  // Check cache for existing chunks
+  const cachedChunks = embeddingCache.getChunks(content);
+  if (cachedChunks) {
+    chunks.push(...cachedChunks);
   }
+
+  // Generate embeddings in batches
+  const vectors = await generateBulkEmbeddings(chunks, options);
+
+  // Store embeddings in database
+  await Promise.all(
+    chunks.map((chunk, index) =>
+      db.insert(embeddings).values({
+        article_id: articleId,
+        chunk_text: chunk,
+        chunk_index: index,
+        vector: JSON.stringify(vectors[index]),
+      })
+    )
+  );
+
+  // Cache the chunks
+  embeddingCache.setChunks(content, chunks);
 }
 
-export async function findSimilarChunks(query: string, limit = 5): Promise<Array<{ chunkText: string; similarity: number; articleId: number }>> {
-  const queryVector = await generateEmbedding(query);
-  const allEmbeddings = await db.select().from(embeddings);
+export async function findSimilarChunks(
+  query: string,
+  limit = 5,
+  options: EmbeddingOptions = {}
+): Promise<Array<{ chunkText: string; similarity: number; articleId: number }>> {
+  // Check cache first
+  const cachedResults = embeddingCache.getSimilarityResults(query);
+  if (cachedResults) {
+    return cachedResults;
+  }
+
+  const queryVector = await generateEmbedding(query, options);
+  const allEmbeddings = await db
+    .select({
+      id: embeddings.id,
+      article_id: embeddings.article_id,
+      chunk_text: embeddings.chunk_text,
+      vector: embeddings.vector,
+    })
+    .from(embeddings);
   
   const results = allEmbeddings
-    .map((embedding: EmbeddingRecord) => ({
-      ...embedding,
-      similarity: cosineSimilarity(queryVector, JSON.parse(embedding.vector))
+    .map(embedding => ({
+      chunkText: embedding.chunk_text,
+      articleId: embedding.article_id || 0, // Fallback for type safety
+      similarity: calculateCosineSimilarity(queryVector, JSON.parse(embedding.vector))
     }))
-    .filter(result => result.similarity >= SIMILARITY_THRESHOLD)
+    .filter(result => result.similarity >= 0.7) // Configurable threshold
     .sort((a, b) => b.similarity - a.similarity)
     .slice(0, limit);
-    
-  return results.map(({ chunkText, similarity, articleId }) => ({
-    chunkText,
-    similarity,
-    articleId,
-  }));
+
+  // Cache the results
+  embeddingCache.setSimilarityResults(query, results);
+
+  return results;
+}
+
+function calculateCosineSimilarity(a: number[], b: number[]): number {
+  if (a.length !== b.length) {
+    throw new Error("Vectors must have same length");
+  }
+
+  let dotProduct = 0;
+  let normA = 0;
+  let normB = 0;
+
+  for (let i = 0; i < a.length; i++) {
+    dotProduct += a[i] * b[i];
+    normA += a[i] * a[i];
+    normB += b[i] * b[i];
+  }
+
+  return dotProduct / (Math.sqrt(normA) * Math.sqrt(normB));
 }
 
 export async function updateArticleEmbeddings(articleId: number, newContent: string): Promise<void> {
