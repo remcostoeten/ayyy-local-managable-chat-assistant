@@ -8,7 +8,9 @@
     "gen": "bunx drizzle-kit generate",
     "push": "bunx drizzle-kit push",
     "check-ollama": "tsx scripts/check-ollama.ts",
-    "generate-embeddings": "ts-node scripts/generate-embeddings.ts"
+    "generate-embeddings": "ts-node scripts/generate-embeddings.ts",
+    "install-models": "bun scripts/install-models.ts",
+    "check-models": "bun scripts/install-models.ts --check-only"
   },
   "dependencies": {
     "@ai-sdk/groq": "latest",
@@ -52,6 +54,7 @@
     "ai": "latest",
     "autoprefixer": "^10.4.20",
     "better-sqlite3": "latest",
+    "boxen": "^7.1.1",
     "child_process": "latest",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.0.0",
@@ -66,6 +69,7 @@
     "next-themes": "^0.4.4",
     "nextjs-toploader": "^3.8.16",
     "openai": "^4.100.0",
+    "ora": "^8.0.1",
     "react": "^19",
     "react-day-picker": "8.10.1",
     "react-dom": "^19",
@@ -86,9 +90,12 @@
     "@tailwindcss/postcss": "^4.1.7",
     "@tailwindcss/typography": "^0.5.16",
     "@types/node": "^22",
+    "@types/prompts": "^2.4.9",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "chalk": "^5.3.0",
     "drizzle-kit": "^0.31.1",
+    "prompts": "^2.4.2",
     "tailwindcss": "^4",
     "tsx": "^4.7.1",
     "typescript": "^5"

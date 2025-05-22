@@ -201,117 +201,76 @@ export default function ModelSettings() {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
-          {/* Model Status */}
-          <div className="space-y-4">
-            <div className="flex justify-between items-center">
-              <h3 className="font-medium">Model Status</h3>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={checkModelStatus}
-                disabled={isCheckingModels}
-              >
-                <RefreshCw className={`h-4 w-4 mr-2 ${isCheckingModels ? 'animate-spin' : ''}`} />
-                Refresh Status
-              </Button>
-            </div>
-            <div className="grid gap-2">
-              {modelStatus.map((status) => (
-                <div key={status.id} className="flex items-center justify-between p-2 rounded-lg border">
-                  <div className="flex items-center gap-2">
-                    {status.isLoaded ? (
-                      <CheckCircle2 className="h-5 w-5 text-green-500" />
-                    ) : (
-                      <AlertCircle className="h-5 w-5 text-yellow-500" />
-                    )}
-                    <span className="font-medium">{
-                      AVAILABLE_MODELS.find(m => m.id === status.id)?.name || status.id
-                    }</span>
-                  </div>
-                  <span className="text-sm text-gray-500">
-                    {status.isLoaded ? "Gereed" : 
-                     status.isInstalled ? "Geïnstalleerd, niet geladen" : 
-                     "Niet geïnstalleerd"}
-                  </span>
-                </div>
-              ))}
-            </div>
-            {modelStatus.some(s => !s.isLoaded) && (
-              <Alert>
-                <AlertCircle className="h-4 w-4" />
-                <AlertTitle>Sommige modellen zijn niet beschikbaar</AlertTitle>
-                <AlertDescription>
-                  Voer <code className="text-sm">pnpm check-ollama</code> uit om de modellen te installeren en laden.
-                </AlertDescription>
-              </Alert>
-            )}
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="model">Model</Label>
-            <Select
-              value={settings.model}
-              onValueChange={handleModelChange}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Selecteer een model" />
-              </SelectTrigger>
-              <SelectContent>
-                {AVAILABLE_MODELS.map((model) => (
-                  <SelectItem key={model.id} value={model.id}>
-                    <div className="flex flex-col">
-                      <span>{model.name}</span>
-                      <span className="text-xs text-gray-500">{model.description}</span>
-                    </div>
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <p className="text-sm text-gray-500">
-              Alle modellen draaien lokaal via Ollama voor optimale prestaties en privacy.
-            </p>
-          </div>
-
-          {/* System Prompt */}
-          <div className="space-y-2">
-            <Label htmlFor="systemPrompt">Instructions for the LLM.</Label>
-            <Textarea
-              id="systemPrompt"
-              value={settings.systemPrompt}
-              onChange={(e) => setSettings({ ...settings, systemPrompt: e.target.value })}
-              className="min-h-[200px]"
-              placeholder="Voer de systeem instructies in..."
-            />
-          </div>
+          {message && (
+            <Alert variant={message.type === "success" ? "default" : "destructive"}>
+              <AlertCircle className="h-4 w-4" />
+              <AlertTitle>{message.type === "success" ? "Success" : "Error"}</AlertTitle>
+              <AlertDescription>{message.text}</AlertDescription>
+            </Alert>
+          )}
 
           <div className="space-y-4">
-            <div className="flex justify-between items-center">
-              <div className="flex items-center gap-2">
-                <Label htmlFor="temperature">Temperature</Label>
-                <p>The higher the temperature, the more creative the model will be. Also known as psycheelic madness, will halucinate 100%.</p>
+            <div>
+              <Label htmlFor="model">Model</Label>
+              <Select value={settings.model} onValueChange={handleModelChange}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select a model" />
+                </SelectTrigger>
+                <SelectContent>
+                  {AVAILABLE_MODELS.map(model => (
+                    <SelectItem key={model.id} value={model.id}>
+                      {model.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div>
+              <Label htmlFor="systemPrompt" className="flex items-center gap-2">
+                System Prompt
                 <Tooltip>
-                  <TooltipTrigger asChild>
-                    <InfoIcon className="h-4 w-4 text-gray-400 cursor-help" />
+                  <TooltipTrigger>
+                    <InfoIcon className="h-4 w-4" />
                   </TooltipTrigger>
                   <TooltipContent>
-                    <p>Bepaalt de creativiteit en willekeurigheid van het model. Lagere waarden (0.1-0.5) geven consistentere antwoorden, hogere waarden (0.7-1.0) geven meer creatieve antwoorden.</p>
+                    <p>De basis instructies voor het AI model. Dit bepaalt hoe het model zich gedraagt en antwoordt.</p>
                   </TooltipContent>
                 </Tooltip>
-              </div>
-              <span className="text-sm text-gray-500">{settings.temperature}</span>
+              </Label>
+              <Textarea
+                id="systemPrompt"
+                value={settings.systemPrompt}
+                onChange={(e) => setSettings(prev => ({ ...prev, systemPrompt: e.target.value }))}
+                className="min-h-[200px] font-mono text-sm"
+                placeholder="Voer de systeem prompt in..."
+              />
             </div>
-            <Slider
-              id="temperature"
-              min={0}
-              max={2}
-              step={0.1}
-              value={[settings.temperature]}
-              onValueChange={(value) => setSettings({ ...settings, temperature: value[0] })}
-            />
-          </div>
 
-          <div className="space-y-2">
-            <div className="flex items-center gap-2">
+            <div>
+              <Label htmlFor="temperature" className="flex items-center gap-2">
+                Temperature
+                <Tooltip>
+                  <TooltipTrigger>
+                    <InfoIcon className="h-4 w-4" />
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>Bepaalt hoe creatief het model is. Lager = meer gefocust, hoger = meer creatief.</p>
+                  </TooltipContent>
+                </Tooltip>
+              </Label>
+              <Slider
+                id="temperature"
+                min={0}
+                max={1}
+                step={0.1}
+                value={[settings.temperature]}
+                onValueChange={([value]) => setSettings(prev => ({ ...prev, temperature: value }))}
+              />
+              <span className="text-sm text-muted-foreground">{settings.temperature}</span>
+            </div>
+
+            <div className="space-y-2">
               <Label htmlFor="maxTokens">Maximum Tokens</Label>
               <Tooltip>
                 <TooltipTrigger asChild>
@@ -427,15 +386,6 @@ export default function ModelSettings() {
 
           {/* Save Button and Message */}
           <div className="pt-6 space-y-4">
-            {message && (
-              <Alert variant={message.type === "success" ? "default" : "destructive"}>
-                <AlertCircle className="h-4 w-4" />
-                <AlertTitle>
-                  {message.type === "success" ? "Succes" : "Fout"}
-                </AlertTitle>
-                <AlertDescription>{message.text}</AlertDescription>
-              </Alert>
-            )}
             <Button
               onClick={handleSave}
               disabled={isSaving}
