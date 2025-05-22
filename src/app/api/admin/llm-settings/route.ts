@@ -5,6 +5,25 @@ import { verifyGroqApiKey } from '@/lib/ai/groq';
 import { eq } from 'drizzle-orm';
 import { encryptText, decryptText } from '@/lib/utils/encryption';
 
+// Helper function to verify OpenAI API key
+async function verifyOpenAIApiKey(apiKey: string): Promise<{ valid: boolean; error?: string }> {
+  try {
+    const response = await fetch('https://api.openai.com/v1/models', {
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+      },
+    });
+
+    if (!response.ok) {
+      return { valid: false, error: 'Invalid OpenAI API key' };
+    }
+
+    return { valid: true };
+  } catch (error) {
+    return { valid: false, error: 'Failed to verify OpenAI API key' };
+  }
+}
+
 export async function GET() {
   try {
     const db = await getDb();
@@ -48,24 +67,33 @@ export async function GET() {
 
 export async function POST(req: Request) {
   try {
-    const { provider, apiKey } = await req.json();
+    const { provider, apiKey, openaiModel } = await req.json();
     const db = await getDb();
 
-    if (provider === 'groq' && apiKey) {
-      // Verify API key before storing
-      const verification = await verifyGroqApiKey(apiKey);
-      if (!verification.valid) {
-        return NextResponse.json({ error: verification.error }, { status: 400 });
+    // Verify API key for cloud providers
+    if (apiKey) {
+      let verification;
+      
+      if (provider === 'groq') {
+        verification = await verifyGroqApiKey(apiKey);
+      } else if (provider === 'openai') {
+        verification = await verifyOpenAIApiKey(apiKey);
       }
 
+      if (verification && !verification.valid) {
+        return NextResponse.json({ error: verification.error }, { status: 400 });
+      }
+    }
+
+    // Deactivate all current settings
+    await db
+      .update(llmSettings)
+      .set({ isActive: false })
+      .where(eq(llmSettings.isActive, true));
+
+    if (['groq', 'openai'].includes(provider) && apiKey) {
       // Encrypt API key
       const { encryptedData, iv, tag } = encryptText(apiKey);
-
-      // Deactivate all current settings
-      await db
-        .update(llmSettings)
-        .set({ isActive: false })
-        .where(eq(llmSettings.isActive, true));
 
       // Create new settings with encrypted API key
       const newSettings = await db
@@ -75,6 +103,7 @@ export async function POST(req: Request) {
           apiKey: encryptedData,
           apiKeyIv: iv,
           apiKeyTag: tag,
+          openaiModel: provider === 'openai' ? openaiModel : null,
           isActive: true,
         })
         .returning();
@@ -89,11 +118,6 @@ export async function POST(req: Request) {
       });
     } else {
       // Handle local provider
-      await db
-        .update(llmSettings)
-        .set({ isActive: false })
-        .where(eq(llmSettings.isActive, true));
-
       const newSettings = await db
         .insert(llmSettings)
         .values({
@@ -101,6 +125,7 @@ export async function POST(req: Request) {
           apiKey: null,
           apiKeyIv: null,
           apiKeyTag: null,
+          openaiModel: null,
           isActive: true,
         })
         .returning();

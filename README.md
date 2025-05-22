@@ -39,9 +39,21 @@
     - Phi-2 (1.7GB): Microsoft's small but mighty model
   
   #### ☁️ Cloud Integration
-  - Groq API integration available in admin interface
-  - Free credits for new users
-  - Configure your API key in settings
+  - **OpenAI Integration**:
+    - GPT-3.5 Turbo and GPT-4 support
+    - Configurable model selection
+    - Perfect for production deployments
+  - **Groq Integration**:
+    - Ultra-fast inference
+    - Free credits for new users
+  - **Secure API Key Storage**:
+    - 🔒 Military-grade AES-256-GCM encryption
+    - Secure key verification before storage
+    - Zero plaintext storage
+  - **Easy Configuration**:
+    - Simple admin interface
+    - Real-time provider switching
+    - Instant model selection
 
 ### ⚡ Lightning Fast with Turso
 - **Edge-Ready Database**: Powered by libSQL
@@ -53,17 +65,29 @@
 
 ```bash
 # Clone this beauty
-git clone https://github.com/yourusername/ai-kb
-cd ai-kb
+git clone https://github.com/remcostoeten/ayyy-local-RAG-vector-embeddings-knowledge-base ayyy
+cd ayyy
 
 # Install dependencies
+# or bun
 pnpm install
 
+# setup Turso, and encryption keys
+cp .env.example .env
+echo "running script to generate encryption keys and write them to .env "
+pnpm run generate-keys
+echo "installing models..."
 # Install AI models (interactive)
 pnpm run install-models
 
+#
+echo "don't forget your turso db auth token in .env"
+echo "retrieve it from https://turso.tech/ and add it to .env"
+
+sleep 1
+echo "now you can start the app with: pnpm dev"
 # Light it up! 🔥
-pnpm dev
+pnpm dev 
 ```
 
 ### 📦 Model Installation
@@ -147,6 +171,9 @@ We're cooking up some incredible features:
 - ✅ Theme System
 - ✅ Turso Integration
 - ✅ Model Management
+- ✅ Secure API Key Storage
+- ✅ OpenAI Integration
+- ✅ Groq Integration
 - 🏗️ RAG Implementation
 - 🏗️ Vector Search
 - 🎯 Analytics (Planned)
@@ -171,8 +198,93 @@ The app supports various local models through Ollama:
 - **Lightweight**:
   - TinyLlama and Phi-2: Perfect for testing (1.2-1.7GB)
 
+<details>
+
+~/s/ayyyyyyyyyyyyyyyyy (master) > pnpm dev
+
+> ayyy-local-rag-vector-knowledge-base@0.1.0 dev /home/remcostoeten/sandbox/aibot
+> tsx scripts/check-ollama.ts && next dev
+
+
+   ╭──────────────────────────────────────────────────────╮
+   │                                                      │
+   │   🚀 AI Model Setup Assistant                        │
+   │                                                      │
+   │   This will help you set up all required AI models   │
+   │   for your application to work properly.             │
+   │                                                      │
+   ╰──────────────────────────────────────────────────────╯
+
+✔ Ollama is running and healthy
+
+   ╭────────────────────────────────────────────────────────────────╮
+   │                                                                │
+   │   ### Available Models                                         │
+   │                                                                │
+   │   ● mixtral:latest                                             │
+   │     Description: Custom model                                  │
+   │     Size: 24.6 GB                                              │
+   │     Max Tokens: Unknown                                        │
+   │     Last modified: 22/05/2025, 11:22:45 pm                     │
+   │                                                                │
+   │   ● mistral:latest ⭐                                          │
+   │     Description: Fast responses, good English, ideal for FAQ   │
+   │     Size: 3.8 GB                                               │
+   │     Max Tokens: 4096                                           │
+   │     Last modified: 22/05/2025, 11:12:51 pm                     │
+   │                                                                │
+   │   ● codellama:latest                                           │
+   │     Description: Custom model                                  │
+   │     Size: 3.6 GB                                               │
+   │     Max Tokens: Unknown                                        │
+   │     Last modified: 22/05/2025, 11:12:00 pm                     │
+   │                                                                │
+   │   ● llama2:latest                                              │
+   │     Description: Meta's latest model, good all-rounder         │
+   │     Size: 3.6 GB                                               │
+   │     Max Tokens: 4096                                           │
+   │     Last modified: 22/05/2025, 11:10:57 pm                     │
+   │                                                                │
+   ╰────────────────────────────────────────────────────────────────╯
+
+
+   ╭────────────────────────────────────────────────────────────────────╮
+   │                                                                    │
+   │   ### Additional Available Models                                  │
+   │                                                                    │
+   │   ○ Neural-Chat ⭐                                                 │
+   │     Description: Optimized for chat interactions, very efficient   │
+   │     Max Tokens: 8192                                               │
+   │                                                                    │
+   │   ○ Llama 2 13B                                                    │
+   │     Description: Larger, more powerful version of Llama 2          │
+   │     Max Tokens: 8192                                               │
+   │                                                                    │
+   │   ○ TinyLlama                                                      │
+   │     Description: Ultra lightweight model, perfect for testing      │
+   │     Max Tokens: 2048                                               │
+   │                                                                    │
+   │   ○ Phi-2                                                          │
+   │     Description: Microsoft's small but powerful model              │
+   │     Max Tokens: 2048                                               │
+   │                          
+</details>
+
 #### Cloud Integration
 For users who prefer cloud-based inference:
 - Configure Groq API key in the admin interface
 - Get free credits when signing up
 - No additional setup required
+
+## 🔐 Security Features
+
+- **API Key Protection**:
+  - AES-256-GCM encryption for all API keys
+  - Secure key verification system
+  - No plaintext storage in database
+  - Encrypted at rest and in transit
+  
+- **Access Control**:
+  - Role-based admin access
+  - Secure admin dashboard
+  - Activity logging and monitoring

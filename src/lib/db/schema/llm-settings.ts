@@ -10,6 +10,9 @@ export const llmSettings = sqliteTable('llm_settings', {
   apiKeyIv: text('api_key_iv'),
   apiKeyTag: text('api_key_tag'),
   
+  // OpenAI specific settings
+  openaiModel: text('openai_model'),
+  
   isActive: integer('is_active', { mode: 'boolean' }).notNull().default(false),
   createdAt: integer('created_at', { mode: 'timestamp' })
     .notNull()

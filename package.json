@@ -7,6 +7,7 @@
     "build": "next build",
     "gen": "bunx drizzle-kit generate",
     "push": "bunx drizzle-kit push",
+    "generate-keys": "tsx scripts/generate-keys.ts",
     "check-ollama": "tsx scripts/check-ollama.ts",
     "generate-embeddings": "ts-node scripts/generate-embeddings.ts",
     "install-models": "bun scripts/install-models.ts",
