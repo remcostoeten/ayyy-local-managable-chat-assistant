@@ -1,0 +1,53 @@
+{
+  "version": "5",
+  "dialect": "sqlite",
+  "id": "b8f7f8a9-8f1a-4f1a-9f1a-8f1a9f1a8f1a",
+  "prevId": "00000000-0000-0000-0000-000000000002",
+  "tables": {
+    "chat_session_metadata": {
+      "name": "chat_session_metadata",
+      "columns": {
+        "session_id": {
+          "name": "session_id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "title": {
+          "name": "title",
+          "type": "text"
+        },
+        "summary": {
+          "name": "summary",
+          "type": "text"
+        },
+        "last_accessed_at": {
+          "name": "last_accessed_at",
+          "type": "integer",
+          "notNull": true,
+          "default": "CURRENT_TIMESTAMP"
+        },
+        "status": {
+          "name": "status",
+          "type": "text",
+          "default": "'active'"
+        }
+      },
+      "foreignKeys": {
+        "chat_session_metadata_session_id_chat_sessions_id_fk": {
+          "columns": ["session_id"],
+          "referencedColumns": ["id"],
+          "referencedTable": "chat_sessions",
+          "onDelete": "cascade"
+        }
+      }
+    }
+  },
+  "enums": {},
+  "schemas": {},
+  "_meta": {
+    "schemas": {},
+    "tables": {},
+    "columns": {}
+  }
+} 
