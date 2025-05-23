@@ -1,24 +1,20 @@
 'use server';
 
-import { drizzle } from 'drizzle-orm/better-sqlite3';
-import Database from 'better-sqlite3';
-import * as schema from './schema';
-import { eq } from 'drizzle-orm';
-import { storeEmbedding, updateEmbedding, deleteEmbedding } from '../ai/embeddings';
+import { db } from './client'
+import { eq } from 'drizzle-orm'
+import { storeEmbedding, updateEmbedding, deleteEmbedding } from '../ai/embeddings'
+import { knowledgeArticles, articleCategories, categories } from './schema'
+import type { KnowledgeArticle, Category } from './schema'
 
-const sqlite = new Database('sqlite.db');
-export const db = drizzle(sqlite, { schema: schema });
-
-// Export async functions for server actions
 export async function getDb() {
-  return db;
+  return db
 }
 
 export async function query() {
   return {
     db,
-    schema: schema,
-  };
+    schema: { knowledgeArticles, articleCategories, categories },
+  }
 }
 
 export async function createArticle(data: {
@@ -27,37 +23,40 @@ export async function createArticle(data: {
   categoryIds?: string[];
 }) {
   try {
-    const article = await db.insert(schema.knowledgeArticles).values({
-      title: data.title,
-      content: data.content,
-    }).returning().get();
+    const article = await db
+      .insert(knowledgeArticles)
+      .values({
+        title: data.title,
+        content: data.content,
+      })
+      .returning()
+      .get()
 
     if (data.categoryIds?.length) {
-      await db.insert(schema.articleCategories).values(
+      await db.insert(articleCategories).values(
         data.categoryIds.map(categoryId => ({
           articleId: article.id,
           categoryId,
         }))
-      );
+      )
     }
 
-    // Generate and store embedding for the article
-    await storeEmbedding(article.id, data.content);
+    await storeEmbedding(article.id, data.content)
 
-    return { success: true, article };
+    return { success: true, article }
   } catch (error) {
-    console.error('Error creating article:', error);
-    return { success: false, error: (error as Error).message };
+    console.error('Error creating article:', error)
+    return { success: false, error: (error as Error).message }
   }
 }
 
 export async function getArticles() {
   try {
-    const articles = await db.select().from(schema.knowledgeArticles);
-    return { success: true, articles };
+    const articles = await db.select().from(knowledgeArticles)
+    return { success: true, articles }
   } catch (error) {
-    console.error('Error getting articles:', error);
-    return { success: false, error: (error as Error).message };
+    console.error('Error getting articles:', error)
+    return { success: false, error: (error as Error).message }
   }
 }
 
@@ -65,14 +64,14 @@ export async function getArticle(id: string) {
   try {
     const article = await db
       .select()
-      .from(schema.knowledgeArticles)
-      .where(eq(schema.knowledgeArticles.id, id))
-      .get();
+      .from(knowledgeArticles)
+      .where(eq(knowledgeArticles.id, id))
+      .get()
 
-    return { success: true, article };
+    return { success: true, article }
   } catch (error) {
-    console.error('Error getting article:', error);
-    return { success: false, error: (error as Error).message };
+    console.error('Error getting article:', error)
+    return { success: false, error: (error as Error).message }
   }
 }
 
@@ -83,79 +82,76 @@ export async function updateArticle(id: string, data: {
 }) {
   try {
     const article = await db
-      .update(schema.knowledgeArticles)
+      .update(knowledgeArticles)
       .set({
         title: data.title,
         content: data.content,
         updatedAt: new Date(),
       })
-      .where(eq(schema.knowledgeArticles.id, id))
+      .where(eq(knowledgeArticles.id, id))
       .returning()
-      .get();
+      .get()
 
     if (data.categoryIds) {
       await db
-        .delete(schema.articleCategories)
-        .where(eq(schema.articleCategories.articleId, id));
+        .delete(articleCategories)
+        .where(eq(articleCategories.articleId, id))
 
-      await db.insert(schema.articleCategories).values(
+      await db.insert(articleCategories).values(
         data.categoryIds.map(categoryId => ({
           articleId: id,
           categoryId,
         }))
-      );
+      )
     }
 
-    // Update embedding if content has changed
     if (data.content) {
-      await updateEmbedding(id, data.content);
+      await updateEmbedding(id, data.content)
     }
 
-    return { success: true, article };
+    return { success: true, article }
   } catch (error) {
-    console.error('Error updating article:', error);
-    return { success: false, error: (error as Error).message };
+    console.error('Error updating article:', error)
+    return { success: false, error: (error as Error).message }
   }
 }
 
 export async function deleteArticle(id: string) {
   try {
-    // Delete the article's embedding
-    await deleteEmbedding(id);
+    await deleteEmbedding(id)
 
-    // Delete the article (this will cascade to articleCategories)
     await db
-      .delete(schema.knowledgeArticles)
-      .where(eq(schema.knowledgeArticles.id, id));
+      .delete(knowledgeArticles)
+      .where(eq(knowledgeArticles.id, id))
 
-    return { success: true };
+    return { success: true }
   } catch (error) {
-    console.error('Error deleting article:', error);
-    return { success: false, error: (error as Error).message };
+    console.error('Error deleting article:', error)
+    return { success: false, error: (error as Error).message }
   }
 }
 
 export async function getCategories() {
   try {
-    const categories = await db.select().from(schema.categories);
-    return { success: true, categories };
+    const allCategories = await db.select().from(categories)
+    return { success: true, categories: allCategories }
   } catch (error) {
-    console.error('Error getting categories:', error);
-    return { success: false, error: (error as Error).message };
+    console.error('Error getting categories:', error)
+    return { success: false, error: (error as Error).message }
   }
 }
 
 export async function createCategory(name: string) {
   try {
     const category = await db
-      .insert(schema.categories)
+      .insert(categories)
       .values({ name })
       .returning()
-      .get();
+      .get()
 
-    return { success: true, category };
+    return { success: true, category }
   } catch (error) {
-    console.error('Error creating category:', error);
-    return { success: false, error: (error as Error).message };
+    console.error('Error creating category:', error)
+    return { success: false, error: (error as Error).message }
   }
 }

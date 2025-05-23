@@ -1,4 +1,4 @@
-import { db } from '@/lib/db';
+import { db } from '@/lib/db/client';
 import { articles } from '@/lib/db/schema';
 import { storeArticleEmbeddings } from '@/lib/ai/embeddings';
 
