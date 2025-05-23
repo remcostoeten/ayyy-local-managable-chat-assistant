@@ -285,6 +285,108 @@ For users who prefer cloud-based inference:
   - Encrypted at rest and in transit
   
 - **Access Control**:
-  - Role-based admin access
-  - Secure admin dashboard
   - Activity logging and monitoring
+
+# AI-Powered Content Platform
+
+A modern content platform with advanced AI features including semantic search, personalized recommendations, and content clustering.
+
+## Features
+
+### 1. Semantic Search
+- Powered by Hugging Face embeddings (sentence-transformers/all-MiniLM-L6-v2)
+- Advanced filtering by date, category, and similarity threshold
+- Real-time search analytics and query tracking
+
+### 2. Smart Recommendations
+- Hybrid recommendation system combining:
+  - Content-based filtering using semantic similarity
+  - Collaborative filtering based on user behavior
+  - Topic clustering for related content discovery
+- Personalized suggestions based on user preferences and reading history
+- Automatic content categorization and grouping
+
+### 3. Analytics & Insights
+- User interaction tracking
+- Popular content identification
+- Query distribution analysis
+- Performance metrics and monitoring
+
+## Tech Stack
+
+- Next.js 14 with App Router
+- SQLite with Drizzle ORM
+- Hugging Face for embeddings
+- TailwindCSS for styling
+- TypeScript for type safety
+
+## Getting Started
+
+1. Clone the repository:
+```bash
+git clone https://github.com/yourusername/aibot.git
+cd aibot
+```
+
+2. Install dependencies:
+```bash
+pnpm install
+```
+
+3. Set up environment variables:
+```bash
+cp .env.example .env
+```
+
+Required environment variables:
+- `HUGGINGFACE_API_KEY`: Your Hugging Face API token
+- `DATABASE_URL`: SQLite database URL
+
+4. Initialize the database:
+```bash
+pnpm drizzle-kit generate:sqlite
+pnpm drizzle-kit push:sqlite
+```
+
+5. Run the development server:
+```bash
+pnpm dev
+```
+
+## API Endpoints
+
+### Recommendations
+```
+GET /api/recommendations?userId={userId}&limit={limit}
+```
+Returns personalized article recommendations based on user preferences and behavior.
+
+### Search
+```
+GET /api/search?query={query}&filters={filters}
+```
+Performs semantic search with optional filters (date, category, etc.).
+
+## Database Schema
+
+### Articles
+- Basic fields: id, title, content, category
+- Analytics: views, ratings, created/updated timestamps
+- AI features: topic vectors, cluster assignments
+
+### User Ratings
+- Tracks user interactions and preferences
+- Used for collaborative filtering
+- Includes rating scores and timestamps
+
+## Contributing
+
+1. Fork the repository
+2. Create your feature branch (`git checkout -b feature/amazing-feature`)
+3. Commit your changes (`git commit -m 'Add amazing feature'`)
+4. Push to the branch (`git push origin feature/amazing-feature`)
+5. Open a Pull Request
+
+## License
+
+MIT License - see LICENSE file for details
