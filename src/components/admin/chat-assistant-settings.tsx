@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import React, {useState, useEffect} from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -8,98 +8,159 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar"
-import { Loader2, Upload } from "lucide-react"
-import { updateChatAssistant, updateStatus } from "@/api/mutations/update-chat-assistant"
-import { getChatAssistant } from "@/api/queries/get-chat-assistant"
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog"
+import { Loader2, Upload, Trash2, Plus, Check } from "lucide-react"
 import { toast } from "sonner"
 
 interface ChatAssistantSettings {
-  id: string
-  name: string
-  description: string
-  status: "away" | "active" | "inactive"
-  avatar: string
+  id: string;
+  name: string;
+  description: string;
+  status: "away" | "active" | "inactive";
+  avatar: string;
 }
 
-export default function ChatAssistantSettings() {
-  const [isLoading, setIsLoading] = useState(true)
-  const [isSaving, setIsSaving] = useState(false)
-  const [settings, setSettings] = useState<ChatAssistantSettings>({
-    id: "default",
+const ChatAssistantSettings: React.FC = () => {
+  const [isLoading, setIsLoading] = React.useState(true)
+  const [isSaving, setIsSaving] = React.useState(false)
+  const [isDeleting, setIsDeleting] = React.useState(false)
+  const [saved, setSaved] = React.useState(false)
+  const [settings, setSettings] = React.useState<ChatAssistantSettings>({
+    id: "",
     name: "",
     description: "",
     status: "inactive",
     avatar: ""
   })
 
-  useEffect(() => {
-    loadSettings()
-  }, [])
-
-  const loadSettings = async () => {
+  const loadSettings = React.useCallback(async () => {
     try {
-      const response = await getChatAssistant()
-      if (response.success && response.chatAssistant) {
+      const response = await fetch('/api/admin/chat-assistant')
+      const data = await response.json()
+      
+      if (data.success && data.chatAssistant) {
         setSettings({
-          id: response.chatAssistant.id,
-          name: response.chatAssistant.name,
-          description: response.chatAssistant.description,
-          status: response.chatAssistant.status || "inactive",
-          avatar: response.chatAssistant.avatar
+          id: data.chatAssistant.id,
+          name: data.chatAssistant.name,
+          description: data.chatAssistant.description || "",
+          status: data.chatAssistant.status || "inactive",
+          avatar: data.chatAssistant.avatar || ""
         })
-      } else {
-        toast.error("Failed to load chat assistant settings")
       }
     } catch (error) {
       console.error("Error loading settings:", error)
-      toast.error("Error loading settings")
+      toast.error("Failed to load settings")
     } finally {
       setIsLoading(false)
     }
-  }
+  }, [])
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
+  React.useEffect(() => {
+    loadSettings()
+  }, [loadSettings])
+
+  React.useEffect(() => {
+    setSaved(false)
+  }, [settings])
+
+  const handleCreate = async () => {
     setIsSaving(true)
+    setSaved(false)
 
     try {
-      const response = await updateChatAssistant(settings.id, {
-        name: settings.name,
-        description: settings.description,
-        status: settings.status,
-        avatar: settings.avatar
+      const response = await fetch('/api/admin/chat-assistant', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: settings.name,
+          description: settings.description,
+          status: settings.status,
+          avatar: settings.avatar
+        })
       })
 
-      if (response.success) {
-        toast.success("Settings saved successfully")
+      const data = await response.json()
+
+      if (data.success) {
+        setSettings(prev => ({ ...prev, id: data.chatAssistant.id }))
+        setSaved(true)
+        toast.success("Chat assistant created successfully")
       } else {
-        toast.error(response.error || "Failed to save settings")
+        throw new Error(data.error || "Failed to create chat assistant")
       }
     } catch (error) {
-      console.error("Error saving settings:", error)
-      toast.error("Error saving settings")
+      console.error("Error creating chat assistant:", error)
+      toast.error(error instanceof Error ? error.message : "Failed to create chat assistant")
     } finally {
       setIsSaving(false)
     }
   }
 
-  const handleStatusChange = async (status: "away" | "active" | "inactive") => {
+  const handleUpdate = async () => {
+    setIsSaving(true)
+    setSaved(false)
+
     try {
-      const response = await updateStatus({
-        id: settings.id,
-        status
+      const response = await fetch('/api/admin/chat-assistant', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: settings.id,
+          name: settings.name,
+          description: settings.description,
+          status: settings.status,
+          avatar: settings.avatar
+        })
       })
 
-      if (response.success) {
-        setSettings(prev => ({ ...prev, status }))
-        toast.success("Status updated successfully")
+      const data = await response.json()
+
+      if (data.success) {
+        setSaved(true)
+        toast.success("Settings saved successfully")
       } else {
-        toast.error(response.error || "Failed to update status")
+        throw new Error(data.error || "Failed to save settings")
       }
     } catch (error) {
-      console.error("Error updating status:", error)
-      toast.error("Error updating status")
+      console.error("Error saving settings:", error)
+      toast.error(error instanceof Error ? error.message : "Failed to save settings")
+    } finally {
+      setIsSaving(false)
     }
+  }
+
+  const handleDelete = async () => {
+    setIsDeleting(true)
+
+    try {
+      const response = await fetch(`/api/admin/chat-assistant?id=${settings.id}`, {
+        method: 'DELETE'
+      })
+
+      const data = await response.json()
+
+      if (data.success) {
+        setSettings({
+          id: "",
+          name: "",
+          description: "",
+          status: "inactive",
+          avatar: ""
+        })
+        toast.success("Chat assistant deleted successfully")
+      } else {
+        throw new Error(data.error || "Failed to delete chat assistant")
+      }
+    } catch (error) {
+      console.error("Error deleting chat assistant:", error)
+      toast.error(error instanceof Error ? error.message : "Failed to delete chat assistant")
+    } finally {
+      setIsDeleting(false)
+    }
+  }
+
+  const handleStatusChange = (status: "away" | "active" | "inactive") => {
+    setSettings((prev: ChatAssistantSettings) => ({ ...prev, status }))
   }
 
   const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -108,7 +169,7 @@ export default function ChatAssistantSettings() {
 
     // TODO: Implement avatar upload to storage service
     // For now, we'll use a placeholder
-    setSettings(prev => ({
+    setSettings((prev: ChatAssistantSettings) => ({
       ...prev,
       avatar: URL.createObjectURL(file)
     }))
@@ -126,7 +187,10 @@ export default function ChatAssistantSettings() {
 
   return (
     <Card>
-      <form onSubmit={handleSubmit}>
+      <form onSubmit={(e: React.FormEvent) => {
+        e.preventDefault()
+        settings.id ? handleUpdate() : handleCreate()
+      }}>
         <CardHeader>
           <CardTitle>Chat Assistant Settings</CardTitle>
           <CardDescription>Configure your AI chat assistant's profile and behavior</CardDescription>
@@ -149,6 +213,7 @@ export default function ChatAssistantSettings() {
                   accept="image/*"
                   className="hidden"
                   onChange={handleAvatarUpload}
+                  disabled={isSaving}
                 />
               </Label>
             </div>
@@ -161,6 +226,8 @@ export default function ChatAssistantSettings() {
               value={settings.name}
               onChange={(e) => setSettings({ ...settings, name: e.target.value })}
               placeholder="AI Assistant"
+              disabled={isSaving}
+              required
             />
           </div>
 
@@ -172,6 +239,7 @@ export default function ChatAssistantSettings() {
               onChange={(e) => setSettings({ ...settings, description: e.target.value })}
               placeholder="A helpful AI assistant..."
               rows={3}
+              disabled={isSaving}
             />
           </div>
 
@@ -179,7 +247,8 @@ export default function ChatAssistantSettings() {
             <Label htmlFor="status">Status</Label>
             <Select
               value={settings.status}
-              onValueChange={(value: "away" | "active" | "inactive") => handleStatusChange(value)}
+              onValueChange={handleStatusChange}
+              disabled={isSaving}
             >
               <SelectTrigger>
                 <SelectValue />
@@ -207,19 +276,50 @@ export default function ChatAssistantSettings() {
             </Select>
           </div>
         </CardContent>
-        <CardFooter>
-          <Button type="submit" disabled={isSaving} className="w-full">
+        <CardFooter className="flex justify-between">
+          {settings.id ? (
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button variant="destructive" type="button" disabled={isSaving || isDeleting}>
+                  <Trash2 className="h-4 w-4 mr-2" />
+                  Delete Assistant
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    This action cannot be undone. This will permanently delete the chat assistant.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                  <AlertDialogAction onClick={handleDelete}>Delete</AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          ) : (
+            <div /> /* Empty div for spacing */
+          )}
+          
+          <Button 
+            type="submit" 
+            disabled={isSaving}
+            className={saved ? 'bg-green-500 hover:bg-green-600' : ''}
+          >
             {isSaving ? (
-              <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Saving...
-              </>
-            ) : (
-              "Save Changes"
-            )}
+              <Loader2 className="h-4 w-4 animate-spin mr-2" />
+            ) : saved ? (
+              <Check className="h-4 w-4 mr-2" />
+            ) : settings.id ? (
+              <Plus className="h-4 w-4 mr-2" />
+            ) : null}
+            {isSaving ? 'Saving...' : saved ? 'Saved' : settings.id ? 'Update Assistant' : 'Create Assistant'}
           </Button>
         </CardFooter>
       </form>
     </Card>
   )
-} 
+}
+
+export default ChatAssistantSettings 
