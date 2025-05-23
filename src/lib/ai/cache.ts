@@ -1,9 +1,9 @@
-import LRU from 'lru-cache';
 
 interface CacheOptions {
   max: number;
   ttl: number;
 }
+import { LRUCache as LRU } from 'lru-cache';
 
 export class EmbeddingCache {
   private cache: LRU<string, number[]>;

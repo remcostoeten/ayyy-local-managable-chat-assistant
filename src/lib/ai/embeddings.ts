@@ -5,6 +5,8 @@ import { TextSplitter, getOptimalChunkSize } from './text-splitter';
 import { embeddingCache } from './cache';
 import pLimit from 'p-limit';
 import { SQL } from 'drizzle-orm';
+import { HfInference } from '@huggingface/inference'
+import type { FeatureExtractionOutput } from '@huggingface/inference'
 
 const CHUNK_SIZE = 500;
 const CHUNK_OVERLAP = 100;
@@ -12,6 +14,8 @@ const SIMILARITY_THRESHOLD = 0.7;
 const BATCH_SIZE = 10; // Number of embeddings to generate in parallel
 const RETRY_ATTEMPTS = 3;
 const RETRY_DELAY = 1000; // 1 second
+
+const hf = new HfInference(process.env.HF_ACCESS_TOKEN)
 
 interface EmbeddingOptions {
   modelName?: string;
@@ -29,65 +33,46 @@ interface EmbeddingRecord {
   createdAt: Date;
 }
 
-export async function generateEmbedding(text: string, options: EmbeddingOptions = {}): Promise<number[]> {
+export async function generateEmbedding(text: string): Promise<number[]> {
   const cachedEmbedding = embeddingCache.getEmbedding(text);
   if (cachedEmbedding) {
     return cachedEmbedding;
   }
 
-  const {
-    modelName = "mistral",
-    retryAttempts = RETRY_ATTEMPTS,
-    retryDelay = RETRY_DELAY
-  } = options;
-
-  let lastError: Error | null = null;
-
-  for (let attempt = 0; attempt < retryAttempts; attempt++) {
-    try {
-      const response = await fetch("http://localhost:11434/api/embeddings", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          model: modelName,
-          prompt: text,
-        }),
-      });
-
-      if (!response.ok) {
-        throw new Error(`Failed to generate embedding: ${response.statusText}`);
-      }
-
-      const data = await response.json();
-      if (!data.embedding || !Array.isArray(data.embedding)) {
-        throw new Error('Invalid embedding response format');
-      }
-      
-      // Cache the result
-      embeddingCache.setEmbedding(text, data.embedding);
-      
-      return data.embedding;
-    } catch (error) {
-      lastError = error as Error;
-      if (attempt < retryAttempts - 1) {
-        await new Promise(resolve => setTimeout(resolve, retryDelay));
-      }
+  try {
+    const response = await hf.featureExtraction({
+      model: 'sentence-transformers/all-MiniLM-L6-v2',
+      inputs: text,
+    })
+    
+    let embedding: number[] = []
+    
+    if (Array.isArray(response)) {
+      embedding = response as number[]
+    } else if (typeof response === 'number') {
+      embedding = [response]
+    } else if (Array.isArray((response as number[][])[0])) {
+      embedding = (response as number[][])[0]
     }
+    
+    // Cache the result
+    embeddingCache.setEmbedding(text, embedding);
+    
+    return embedding
+  } catch (error) {
+    console.error('Error generating embedding:', error)
+    throw error
   }
-
-  throw lastError || new Error('Failed to generate embedding after retries');
 }
 
 export async function generateBulkEmbeddings(
   texts: string[],
-  options: EmbeddingOptions = {}
 ): Promise<number[][]> {
-  const { batchSize = BATCH_SIZE } = options;
-  const limit = pLimit(batchSize);
+  const limit = pLimit(BATCH_SIZE);
   
   const embeddings = await Promise.all(
     texts.map(text => 
-      limit(() => generateEmbedding(text, options))
+      limit(() => generateEmbedding(text))
     )
   );
 
@@ -240,27 +225,21 @@ export function chunkText(text: string): string[] {
 
 export async function storeArticleEmbeddings(
   articleId: number,
-  content: string,
-  options: EmbeddingOptions = {}
+  content: string
 ): Promise<void> {
-  // Create text splitter with optimal chunk size
   const textSplitter = new TextSplitter(
-    getOptimalChunkSize(4096) // Adjust based on your model's context window
+    getOptimalChunkSize(4096)
   );
 
-  // Split content into chunks
   const chunks = textSplitter.splitText(content);
   
-  // Check cache for existing chunks
   const cachedChunks = embeddingCache.getChunks(content);
   if (cachedChunks) {
     chunks.push(...cachedChunks);
   }
 
-  // Generate embeddings in batches
-  const vectors = await generateBulkEmbeddings(chunks, options);
+  const vectors = await generateBulkEmbeddings(chunks);
 
-  // Store embeddings in database
   await Promise.all(
     chunks.map((chunk, index) =>
       db.insert(embeddings).values({
@@ -272,7 +251,6 @@ export async function storeArticleEmbeddings(
     )
   );
 
-  // Cache the chunks
   embeddingCache.setChunks(content, chunks);
 }
 
