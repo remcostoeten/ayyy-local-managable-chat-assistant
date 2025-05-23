@@ -1,15 +1,15 @@
-import { NextResponse } from 'next/server'
-import { db } from '@/lib/db'
+import { NextRequest, NextResponse } from 'next/server'
+import { db } from '@/lib/db/client'
 import { articles } from '@/lib/db/schema'
 import { eq } from 'drizzle-orm'
 
 export async function PUT(
-  request: Request,
-  { params }: { params: { id: string } }
+  request: NextRequest,
+  context: { params: { id: string } }
 ) {
   try {
     const { title, content } = await request.json()
-    const articleId = parseInt(params.id)
+    const articleId = parseInt(context.params.id)
     
     if (!title || !content || isNaN(articleId)) {
       return NextResponse.json(
@@ -46,11 +46,11 @@ export async function PUT(
 }
 
 export async function DELETE(
-  request: Request,
-  { params }: { params: { id: string } }
+  request: NextRequest,
+  context: { params: { id: string } }
 ) {
   try {
-    const articleId = parseInt(params.id)
+    const articleId = parseInt(context.params.id)
     
     if (isNaN(articleId)) {
       return NextResponse.json(

@@ -1,7 +1,6 @@
 import { NextResponse } from 'next/server'
-import { db } from '@/lib/db'
 import { articles } from '@/lib/db/schema'
-import { eq } from 'drizzle-orm'
+import { db } from '@/lib/db/client'
 
 export async function GET() {
   try {
@@ -20,7 +19,7 @@ export async function POST(request: Request) {
   try {
     const { title, content } = await request.json()
     
-    if (!title || !content) {
+    if (!title || ! content) {
       return NextResponse.json(
         { error: 'Title and content are required' },
         { status: 400 }
