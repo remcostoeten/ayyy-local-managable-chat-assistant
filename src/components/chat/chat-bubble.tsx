@@ -8,48 +8,54 @@ import {
   Send,
   Settings,
   Maximize2,
-  Minimize2,
-  ThumbsUp,
-  ThumbsDown,
-  Trash,
-  Edit2,
-  Check,
-  ChevronDown,
-  StopCircle,
+  Minimize2, ChevronDown
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { TextShimmer } from "@/shared/ui/shimmer-text";
 import {
   createChatSession,
   sendMessage,
   getSuggestionsForChat,
 } from "@/app/actions/chat";
-import type {
-  ChatSessionResponse,
-  ChatMessageResponse,
-  ChatSuggestionsResponse,
-} from "@/app/actions/chat";
 import { cn } from "@/lib/utils";
 import Link from "next/link";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Card } from "@/components/ui/card";
+import { getChatAssistantSettings } from "@/lib/utils";
+import { AssistantResponse } from "ai";
+import { featureFlags, assistantDefaults, isDevelopment } from "@/lib/config/environment";
 
-export interface ChatBubbleHandle {
+const LOADING_MESSAGES = isDevelopment 
+  ? assistantDefaults.development.loadingMessages 
+  : ["Assistant is typing..."];
+
+type TChatBubbleHandle = {
   setIsOpen: (open: boolean) => void;
   handleSend: (message: string) => void;
 }
 
-interface ChatBubbleProps {
+type TChatBubbleProps = {
   isWidget?: boolean;
+  content: string;
+  role: "assistant" | "user";
+  avatar?: string;
+  name?: string;
+  timestamp?: string;
 }
 
-const LOADING_MESSAGES = [
-  "Even geduld! Ik kom er aan, ben even ijskoffie maken",
-  "Momentje, ijskoffie aan het inschenken...",
-  "Slurp... even mijn ijskoffie opdrinken!",
-  "Druk bezig met ijskoffie en jouw antwoord..."
-];
+type TChatAssistantSettings = {
+  id: string;
+  name: string;
+  description: string;
+  status: "away" | "active" | "inactive";
+  avatar: string;
+}
 
-const ChatBubble = forwardRef<ChatBubbleHandle, ChatBubbleProps>(({ isWidget = true }, ref) => {
+const ChatBubble = forwardRef<TChatBubbleHandle, TChatBubbleProps>(({ 
+  isWidget = true, 
+  role, 
+  avatar, 
+}, ref) => {
   const [isOpen, setIsOpen] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [sessionId, setSessionId] = useState<string | null>(null);
@@ -59,6 +65,7 @@ const ChatBubble = forwardRef<ChatBubbleHandle, ChatBubbleProps>(({ isWidget = t
       id: string;
       role: "user" | "assistant";
       content: string;
+      timestamp?: string;
     }>
   >([]);
   const [input, setInput] = useState("");
@@ -70,8 +77,14 @@ const ChatBubble = forwardRef<ChatBubbleHandle, ChatBubbleProps>(({ isWidget = t
   const chatBubbleRef = useRef<HTMLDivElement>(null);
   const [isEditing, setIsEditing] = useState(false);
   const [editedContent, setEditedContent] = useState("");
-  const [reaction, setReaction] = useState<"like" | "dislike" | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
+  const [assistantSettings, setAssistantSettings] = useState<TChatAssistantSettings>({
+    id: "",
+    name: isDevelopment ? assistantDefaults.development.name : assistantDefaults.production.name,
+    description: isDevelopment ? assistantDefaults.development.description : assistantDefaults.production.description,
+    status: isDevelopment ? assistantDefaults.development.defaultStatus : assistantDefaults.production.defaultStatus,
+    avatar: ""
+  });
 
   useImperativeHandle(ref, () => ({
     setIsOpen,
@@ -101,12 +114,12 @@ const ChatBubble = forwardRef<ChatBubbleHandle, ChatBubbleProps>(({ isWidget = t
   }, [sessionId]);
 
   useEffect(() => {
-    const fetchSuggestions = async () => {
+    const fetchInitialSuggestions = async () => {
       setIsFetchingSuggestions(true);
       try {
-        const result = await getSuggestions();
+        const result = await getSuggestionsForChat();
         if (result.success && result.suggestions) {
-          setSuggestions(result.suggestions.map(s => s.text));
+          setSuggestions(result.suggestions);
         }
       } catch (error) {
         console.error("Error fetching suggestions:", error);
@@ -114,7 +127,7 @@ const ChatBubble = forwardRef<ChatBubbleHandle, ChatBubbleProps>(({ isWidget = t
       setIsFetchingSuggestions(false);
     };
 
-    fetchSuggestions();
+    fetchInitialSuggestions();
   }, []);
 
   useEffect(() => {
@@ -159,16 +172,14 @@ const ChatBubble = forwardRef<ChatBubbleHandle, ChatBubbleProps>(({ isWidget = t
     if (!userId) return;
 
     const userMessage = {
-      id: `temp-${Date.now()}`,
+      id: `user-${Date.now()}`,
       role: "user" as const,
       content: input,
     };
+    
     setMessages((prev) => [...prev, userMessage]);
     setInput("");
     setIsLoading(true);
-    
-    // Set random loading state type (25% chance for fun message)
-    const useShimmerLoading = Math.random() < 0.25;
 
     abortControllerRef.current = new AbortController();
 
@@ -190,8 +201,7 @@ const ChatBubble = forwardRef<ChatBubbleHandle, ChatBubbleProps>(({ isWidget = t
       }
 
       setMessages((prev) => [
-        ...prev.filter((m) => m.id !== userMessage.id),
-        userMessage,
+        ...prev,
         {
           id: messageId,
           role: "assistant",
@@ -207,8 +217,13 @@ const ChatBubble = forwardRef<ChatBubbleHandle, ChatBubbleProps>(({ isWidget = t
         console.log('Request cancelled');
       } else {
         console.error("Error sending message:", error);
-        setIsLoading(false);
+        setMessages(prev => [...prev, {
+          id: `error-${Date.now()}`,
+          role: "assistant",
+          content: "Sorry, I encountered an error. Please try again."
+        }]);
       }
+      setIsLoading(false);
     } finally {
       abortControllerRef.current = null;
     }
@@ -270,6 +285,39 @@ const ChatBubble = forwardRef<ChatBubbleHandle, ChatBubbleProps>(({ isWidget = t
     }
   };
 
+  const isAssistant = role === "assistant";
+
+  function getEasterEggDescription(assistantName: string) {
+    const settings = isDevelopment 
+      ? assistantDefaults.development
+      : assistantDefaults.production;
+
+    const randomNumber = Math.floor(Math.random() * 100);
+    if (randomNumber > settings.easterEggPercentage) {
+      return `${assistantName} is ${assistantSettings.status}`;
+    }
+    
+    const messages = settings.loadingMessages;
+    const randomMessage = messages[Math.floor(Math.random() * messages.length)];
+    return randomMessage.text;
+  }
+
+  useEffect(() => {
+    const loadAssistantSettings = async () => {
+      const result = await getChatAssistantSettings();
+      if (result.success && result.settings) {
+        setAssistantSettings({
+          id: result.settings.id || "",
+          name: result.settings.name || (isDevelopment ? assistantDefaults.development.name : assistantDefaults.production.name),
+          description: getEasterEggDescription(result.settings.name || assistantSettings.name),
+          status: result.settings.status || (isDevelopment ? assistantDefaults.development.defaultStatus : assistantDefaults.production.defaultStatus),
+          avatar: result.settings.avatar || ""
+        });
+      }
+    };
+    loadAssistantSettings();
+  }, []);
+
   return (
     <>
       {isWidget ? (
@@ -306,18 +354,25 @@ const ChatBubble = forwardRef<ChatBubbleHandle, ChatBubbleProps>(({ isWidget = t
                       : "w-[400px] h-[600px]"
                   )}
                 >
-                  <div className="p-4 border-b bg-gradient-to-r from-purple-600/10 via-purple-500/5 to-purple-600/10 backdrop-blur-sm">
+                  <div className="p-4 border-b bg-gradient-to-r bg-background backdrop-blur-sm">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-3">
                         <div className="relative">
-                          <div className="w-10 h-10 rounded-full bg-gradient-to-br from-purple-500 to-purple-600 flex items-center justify-center shadow-lg">
-                            <span className="text-white font-medium text-sm">H</span>
+                          <div className="w-10 h-10 rounded-full bg-foreground/10 flex items-center justify-center shadow-lg">
+                            <span className="text-foreground font-medium text-sm">
+                              {assistantSettings.name[0]}
+                            </span>
                           </div>
-                          <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-green-500 rounded-full border-2 border-white animate-pulse"></div>
+                          <div className={cn(
+                            "absolute -bottom-1 -right-1 w-4 h-4 rounded-full border-2 border-white",
+                            assistantSettings.status === "active" ? "bg-green-500" :
+                            assistantSettings.status === "away" ? "bg-yellow-500" :
+                            "bg-gray-500"
+                          )} />
                         </div>
                         <div className="flex flex-col">
-                          <span className="font-medium text-foreground">Henk</span>
-                          <span className="text-xs text-muted-foreground">houdt van ijskoffie</span>
+                          <span className="font-medium text-foreground">{assistantSettings.name}</span>
+                          <span className="text-xs text-muted-foreground">{assistantSettings.description}</span>
                         </div>
                       </div>
                       <div className="flex items-center gap-2">
@@ -357,12 +412,12 @@ const ChatBubble = forwardRef<ChatBubbleHandle, ChatBubbleProps>(({ isWidget = t
 
                   <div
                     ref={messagesContainerRef}
-                    className="flex-1 overflow-y-auto p-4 space-y-4"
+                    className="flex-1 overflow-y-auto p-4 space-y-4 bg-background/90"
                   >
                     {messages.length === 0 ? (
                       <div className="h-full flex flex-col items-center justify-center text-center space-y-4 p-4">
-                        <div className="w-16 h-16 rounded-full bg-purple-100 flex items-center justify-center">
-                          <MessageCircle className="h-8 w-8 text-purple-600" />
+                        <div className="w-16 h-16 rounded-full bg-foreground/10 flex items-center justify-center">
+                          <MessageCircle className="h-8 w-8 text-foreground" />
                         </div>
                         <div className="space-y-2">
                           <h3 className="font-semibold text-lg">Welkom bij de chat!</h3>
@@ -390,38 +445,95 @@ const ChatBubble = forwardRef<ChatBubbleHandle, ChatBubbleProps>(({ isWidget = t
                     ) : (
                       <>
                         {messages.map((message) => (
-                          <div
+                          <motion.div
                             key={message.id}
-                            className={`flex ${
-                              message.role === "user" ? "justify-end" : "justify-start"
-                            }`}
+                            initial={{ opacity: 0, y: 20 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            transition={{ duration: 0.3 }}
+                            className={cn(
+                              "flex w-full gap-4 p-4",
+                              message.role === "user" ? "bg-muted/50" : "bg-background"
+                            )}
                           >
-                            <div
-                              className={`max-w-[80%] rounded-lg p-3 ${
-                                message.role === "user"
-                                  ? "bg-purple-600 text-white"        
-                                  : "bg-background text-foreground border border-border"
-                              }`}
-                            >
-                              {message.content}
+                            <Avatar className="h-8 w-8 shrink-0">
+                              {message.role === "assistant" ? (
+                                <>
+                                  <AvatarImage src={assistantSettings.avatar} />
+                                  <AvatarFallback>{assistantSettings.name[0]}</AvatarFallback>
+                                </>
+                              ) : (
+                                <>
+                                  <AvatarImage src={avatar} />
+                                  <AvatarFallback>Y</AvatarFallback>
+                                </>
+                              )}
+                            </Avatar>
+
+                            <div className="flex flex-col gap-2 w-full overflow-hidden">
+                              <div className="flex items-center gap-2">
+                                <span className="text-sm font-medium text-muted-foreground">
+                                  {message.role === "assistant" ? assistantSettings.name : "You"}
+                                </span>
+                                {message.timestamp && (
+                                  <span className="text-xs text-muted-foreground">
+                                    {message.timestamp}
+                                  </span>
+                                )}
+                              </div>
+
+                              <Card className={cn(
+                                "p-3 text-sm shadow-sm",
+                                message.role === "user" 
+                                  ? "bg-primary text-primary-foreground rounded-tl-none" 
+                                  : "bg-muted rounded-tr-none"
+                              )}>
+                                <div className="whitespace-pre-wrap break-words">
+                                  {message.content}
+                                </div>
+                              </Card>
                             </div>
-                          </div>
+                          </motion.div>
                         ))}
                         {isLoading && (
-                          <div className="flex justify-start">
-                            <div className="bg-background/50 backdrop-blur-sm border border-border/50 rounded-lg px-4 py-2 flex items-center gap-3">
+                          <motion.div
+                            initial={{ opacity: 0, y: 20 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            className="flex w-full gap-4 p-4"
+                          >
+                            <Avatar className="h-8 w-8 shrink-0">
+                              <AvatarImage src="/henk-avatar.png" />
+                              <AvatarFallback>H</AvatarFallback>
+                            </Avatar>
+
+                            <div className="flex flex-col gap-2 w-full overflow-hidden">
                               <div className="flex items-center gap-2">
-                                <div className="w-2 h-2 bg-purple-500 rounded-full animate-pulse" />
-                                <span className="text-sm text-muted-foreground">Henk is typing</span>
+                                <span className="text-sm font-medium">Henk</span>
+                                <span className="text-xs text-muted-foreground">
+                                  {getEasterEggDescription(assistantSettings.name)}
+                                </span>
                               </div>
-                              <button
-                                onClick={handleCancel}
-                                className="text-xs text-muted-foreground hover:text-red-500 transition-colors"
-                              >
-                                Cancel
-                              </button>
+
+                              <Card className="p-3 text-sm shadow-sm bg-muted rounded-tr-none">
+                                <div className="flex gap-1 py-2">
+                                  <motion.div
+                                    className="h-2 w-2 rounded-full bg-current opacity-60"
+                                    animate={{ scale: [1, 0.8, 1] }}
+                                    transition={{ duration: 1, repeat: Infinity, delay: 0 }}
+                                  />
+                                  <motion.div
+                                    className="h-2 w-2 rounded-full bg-current opacity-60"
+                                    animate={{ scale: [1, 0.8, 1] }}
+                                    transition={{ duration: 1, repeat: Infinity, delay: 0.2 }}
+                                  />
+                                  <motion.div
+                                    className="h-2 w-2 rounded-full bg-current opacity-60"
+                                    animate={{ scale: [1, 0.8, 1] }}
+                                    transition={{ duration: 1, repeat: Infinity, delay: 0.4 }}
+                                  />
+                                </div>
+                              </Card>
                             </div>
-                          </div>
+                          </motion.div>
                         )}
                       </>
                     )}
@@ -448,21 +560,20 @@ const ChatBubble = forwardRef<ChatBubbleHandle, ChatBubbleProps>(({ isWidget = t
                     )}
                   </AnimatePresence>
 
-                  {/* Input */}
-                  <div className="p-4 border-t border-border/50 bg-background/50 backdrop-blur-sm">
+                  <div className="p-4 border-b bg-gradient-to-r bg-background backdrop-blur-sm">
                     <div className="flex gap-2">
                       <Input
                         value={input}
                         onChange={(e) => setInput(e.target.value)}
                         onKeyDown={(e) => e.key === "Enter" && handleSend()}
-                        placeholder="Type je bericht..."
-                        className="flex-1 bg-white/10 border-white/20 text-foreground placeholder:text-muted-foreground"
+                        placeholder="Ty pe je bericht..."
+                        className="flex-1 bg-background/10 border-background/20 text-foreground placeholder:text-muted-foreground"
                         disabled={isLoading}
                       />
                       <Button 
                         onClick={handleSend} 
                         disabled={isLoading}
-                        className="bg-purple-600 hover:bg-purple-700 text-white"
+                        className="bg-primary text-primary-foreground"
                       >
                         <Send className="h-4 w-4" />
                       </Button>
@@ -488,29 +599,54 @@ const ChatBubble = forwardRef<ChatBubbleHandle, ChatBubbleProps>(({ isWidget = t
         <div className="h-screen flex flex-col">
           <div className="flex-1 overflow-y-auto p-4 space-y-4">
             {messages.map((message) => (
-              <div
+              <motion.div
                 key={message.id}
-                className={`flex ${
-                  message.role === "user" ? "justify-end" : "justify-start"
-                }`}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.3 }}
+                className={cn(
+                  "flex w-full gap-4 p-4",
+                  message.role === "user" ? "bg-muted/50" : "bg-background"
+                )}
               >
-                <div
-                  className={`max-w-[80%] rounded-lg p-3 ${
-                    message.role === "user"
-                      ? "bg-purple-600 text-white"
-                      : "bg-background text-foreground border border-border"
-                  }`}
-                >
-                  {message.content}
+                <Avatar className="h-8 w-8 shrink-0">
+                  <AvatarImage src={message.role === "assistant" ? "/henk-avatar.png" : undefined} />
+                  <AvatarFallback>{message.role === "assistant" ? "H" : "Y"}</AvatarFallback>
+                </Avatar>
+
+                <div className="flex flex-col gap-2 w-full overflow-hidden">
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm font-medium">
+                      {message.role === "assistant" ? "Henk" : "You"}
+                    </span>
+                    {message.timestamp && (
+                      <span className="text-xs text-muted-foreground">
+                        {message.timestamp}
+                      </span>
+                    )}
+                  </div>
+
+                  <Card className={cn(
+                    "p-3 text-sm shadow-sm",
+                    message.role === "user" 
+                      ? "bg-primary text-primary-foreground rounded-tl-none" 
+                      : "bg-muted rounded-tr-none"
+                  )}>
+                    <div className="whitespace-pre-wrap break-words">
+                      {message.content}
+                    </div>
+                  </Card>
                 </div>
-              </div>
+              </motion.div>
             ))}
             {isLoading && (
               <div className="flex justify-start">
                 <div className="bg-background/50 backdrop-blur-sm border border-border/50 rounded-lg px-4 py-2 flex items-center gap-3">
                   <div className="flex items-center gap-2">
                     <div className="w-2 h-2 bg-purple-500 rounded-full animate-pulse" />
-                    <span className="text-sm text-muted-foreground">Henk is typing</span>
+                    <span className="text-sm text-muted-foreground">
+                      {getEasterEggDescription(assistantSettings.name)}
+                    </span>
                   </div>
                   <button
                     onClick={handleCancel}
