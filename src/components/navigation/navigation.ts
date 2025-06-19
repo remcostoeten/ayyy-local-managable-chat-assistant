@@ -1,4 +1,4 @@
-import { Frame, PieChart, Map, LifeBuoy, Send, Settings2, BookOpen, Bot, SquareTerminal, Home } from "lucide-react";
+import { Frame, PieChart, Map, LifeBuoy, Send, Settings2, BookOpen, Bot, SquareTerminal, Home, BarChart } from "lucide-react";
 
 export const navigation = {
   user: {
@@ -29,21 +29,22 @@ export const navigation = {
     },
     {
       title: "Models",
-      url: "#",
+      url: "/admin/models",
       icon: Bot,
       items: [
         {
-          title: "Genesis",
-          url: "#",
+          title: "Manage Models",
+          url: "/admin/models",
         },
         {
-          title: "Explorer",
-          url: "#",
+          title: "Model Statistics",
+          url: "/admin/models/stats",
+          icon: BarChart
         },
         {
-          title: "Quantum",
-          url: "#",
-        },
+          title: "Install New Models",
+          url: "/setup",
+        }
       ],
     },
     {
@@ -71,25 +72,17 @@ export const navigation = {
     },
     {
       title: "Settings",
-      url: "#",
+      url: "/admin/settings",
       icon: Settings2,
       items: [
         {
           title: "General",
-          url: "#",
+          url: "/admin/settings",
         },
         {
-          title: "Team",
-          url: "#",
-        },
-        {
-          title: "Billing",
-          url: "#",
-        },
-        {
-          title: "Limits",
-          url: "#",
-        },
+          title: "Models",
+          url: "/admin/models",
+        }
       ],
     },
   ],
