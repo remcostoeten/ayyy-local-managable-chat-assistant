@@ -1,4 +1,4 @@
-import { Frame, PieChart, Map, LifeBuoy, Send, Settings2, BookOpen, Bot, SquareTerminal, Home } from "lucide-react";
+import { Frame, PieChart, Map, LifeBuoy, Send, Settings2, BookOpen, Bot, SquareTerminal, Home, BarChart } from "lucide-react";
 
 export const navigation = {
   user: {
@@ -35,6 +35,11 @@ export const navigation = {
         {
           title: "Manage Models",
           url: "/admin/models",
+        },
+        {
+          title: "Model Statistics",
+          url: "/admin/models/stats",
+          icon: BarChart
         },
         {
           title: "Install New Models",

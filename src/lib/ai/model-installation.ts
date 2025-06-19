@@ -1,13 +1,19 @@
 import { Model } from '@/core/types/models';
 import fs from 'fs/promises';
+import { createWriteStream } from 'fs';
 import path from 'path';
 import os from 'os';
+import crypto from 'crypto';
 
 export interface ModelInstallationProgress {
     modelId: string;
     progress: number;
     status: 'pending' | 'downloading' | 'installing' | 'completed' | 'error';
     error?: string;
+    downloadedBytes?: number;
+    totalBytes?: number;
+    speed?: number; // bytes per second
+    eta?: number; // seconds
 }
 
 interface ModelDownloadInfo {
@@ -31,6 +37,7 @@ const MODEL_DOWNLOAD_INFO: Record<string, ModelDownloadInfo> = {
 };
 
 const MODELS_DIR = path.join(os.homedir(), '.aycl', 'models');
+const CHUNK_SIZE = 1024 * 1024; // 1MB chunks for progress updates
 
 async function ensureModelsDirectory() {
     try {
@@ -54,7 +61,7 @@ async function checkDiskSpace(requiredSpace: number): Promise<boolean> {
 
 async function downloadModel(
     modelId: string,
-    onProgress: (progress: number) => void
+    onProgress: (progress: number, stats: { downloadedBytes: number; totalBytes: number; speed: number; eta: number }) => void
 ): Promise<string> {
     const modelInfo = MODEL_DOWNLOAD_INFO[modelId];
     if (!modelInfo) {
@@ -62,20 +69,80 @@ async function downloadModel(
     }
 
     const modelPath = path.join(MODELS_DIR, `${modelId}.bin`);
+    const tempPath = `${modelPath}.tmp`;
 
-    // TODO: Implement actual download logic using fetch with progress
-    // This is a placeholder that simulates download
-    for (let i = 0; i <= 100; i += 10) {
-        await new Promise(resolve => setTimeout(resolve, 500));
-        onProgress(i);
+    const startTime = Date.now();
+    let lastUpdate = startTime;
+    let downloadedBytes = 0;
+    let lastDownloadedBytes = 0;
+
+    try {
+        const response = await fetch(modelInfo.url);
+        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+        if (!response.body) throw new Error('Response body is null');
+
+        const totalBytes = Number(response.headers.get('content-length')) || modelInfo.size;
+        const writer = createWriteStream(tempPath);
+        const reader = response.body.getReader();
+
+        while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+
+            writer.write(value);
+            downloadedBytes += value.length;
+
+            // Calculate progress and speed every second
+            const now = Date.now();
+            if (now - lastUpdate >= 1000) {
+                const elapsedSeconds = (now - startTime) / 1000;
+                const speed = downloadedBytes / elapsedSeconds; // bytes per second
+                const remainingBytes = totalBytes - downloadedBytes;
+                const eta = remainingBytes / speed;
+
+                const progress = (downloadedBytes / totalBytes) * 100;
+                onProgress(progress, {
+                    downloadedBytes,
+                    totalBytes,
+                    speed,
+                    eta
+                });
+
+                lastUpdate = now;
+                lastDownloadedBytes = downloadedBytes;
+            }
+        }
+
+        writer.end();
+        await fs.rename(tempPath, modelPath);
+        return modelPath;
+    } catch (error) {
+        // Clean up temp file if download failed
+        try {
+            await fs.unlink(tempPath);
+        } catch (e) {
+            // Ignore cleanup errors
+        }
+        throw error;
     }
-
-    return modelPath;
 }
 
 async function verifyChecksum(filePath: string, expectedChecksum: string): Promise<boolean> {
-    // TODO: Implement actual checksum verification
-    return true;
+    return new Promise((resolve, reject) => {
+        const hash = crypto.createHash('sha256');
+        const stream = createReadStream(filePath);
+
+        stream.on('data', (data) => {
+            hash.update(data);
+        });
+
+        stream.on('end', () => {
+            const fileHash = hash.digest('hex');
+            resolve(`sha256-${fileHash}` === expectedChecksum);
+        });
+
+        stream.on('error', reject);
+    });
 }
 
 export async function installModels(
@@ -112,11 +179,15 @@ export async function installModels(
                 status: 'downloading'
             });
 
-            const modelPath = await downloadModel(modelId, (downloadProgress) => {
+            const modelPath = await downloadModel(modelId, (downloadProgress, stats) => {
                 onProgress?.({
                     modelId,
                     progress: downloadProgress,
-                    status: 'downloading'
+                    status: 'downloading',
+                    downloadedBytes: stats.downloadedBytes,
+                    totalBytes: stats.totalBytes,
+                    speed: stats.speed,
+                    eta: stats.eta
                 });
             });
 
@@ -229,5 +300,119 @@ export async function updateModelLastUsed(modelId: string): Promise<void> {
 export async function getModelDetails(modelId: string): Promise<Model | null> {
     // TODO: Implement fetching detailed model information
     return null;
-} 
-} 
+}
+
+interface ModelUsageStats {
+    modelId: string;
+    totalTokens: number;
+    totalRequests: number;
+    averageLatency: number;
+    lastUsed: string;
+    costEstimate: number;
+    usageByDay: {
+        date: string;
+        tokens: number;
+        requests: number;
+    }[];
+}
+
+interface ModelUsageEvent {
+    modelId: string;
+    timestamp: string;
+    tokens: number;
+    latencyMs: number;
+    success: boolean;
+    error?: string;
+}
+
+async function recordModelUsage(event: ModelUsageEvent): Promise<void> {
+    const statsPath = path.join(MODELS_DIR, 'usage-stats.json');
+    let stats: Record<string, ModelUsageStats> = {};
+
+    try {
+        const content = await fs.readFile(statsPath, 'utf-8');
+        stats = JSON.parse(content);
+    } catch (error) {
+        // File doesn't exist or is invalid, start with empty object
+    }
+
+    const modelStats = stats[event.modelId] || {
+        modelId: event.modelId,
+        totalTokens: 0,
+        totalRequests: 0,
+        averageLatency: 0,
+        lastUsed: '',
+        costEstimate: 0,
+        usageByDay: []
+    };
+
+    // Update total stats
+    modelStats.totalTokens += event.tokens;
+    modelStats.totalRequests += 1;
+    modelStats.lastUsed = event.timestamp;
+
+    // Update average latency
+    modelStats.averageLatency = (
+        (modelStats.averageLatency * (modelStats.totalRequests - 1) + event.latencyMs) /
+        modelStats.totalRequests
+    );
+
+    // Update daily stats
+    const date = event.timestamp.split('T')[0];
+    const dayStats = modelStats.usageByDay.find(d => d.date === date);
+    if (dayStats) {
+        dayStats.tokens += event.tokens;
+        dayStats.requests += 1;
+    } else {
+        modelStats.usageByDay.push({
+            date,
+            tokens: event.tokens,
+            requests: 1
+        });
+    }
+
+    // Keep only last 30 days of daily stats
+    modelStats.usageByDay = modelStats.usageByDay
+        .sort((a, b) => b.date.localeCompare(a.date))
+        .slice(0, 30);
+
+    // Update cost estimate (example rates, adjust based on actual model pricing)
+    const rates: Record<string, number> = {
+        'gpt-4': 0.03,      // $0.03 per 1K tokens
+        'gpt-3.5-turbo': 0.002  // $0.002 per 1K tokens
+    };
+
+    modelStats.costEstimate = (modelStats.totalTokens / 1000) * (rates[event.modelId] || 0);
+
+    // Save updated stats
+    stats[event.modelId] = modelStats;
+    await fs.writeFile(statsPath, JSON.stringify(stats, null, 2));
+
+    // Also update last used timestamp in installation info
+    await updateModelLastUsed(event.modelId);
+}
+
+export async function getModelUsageStats(modelId: string): Promise<ModelUsageStats | null> {
+    try {
+        const statsPath = path.join(MODELS_DIR, 'usage-stats.json');
+        const content = await fs.readFile(statsPath, 'utf-8');
+        const stats = JSON.parse(content);
+        return stats[modelId] || null;
+    } catch (error) {
+        return null;
+    }
+}
+
+export async function getAllModelUsageStats(): Promise<ModelUsageStats[]> {
+    try {
+        const statsPath = path.join(MODELS_DIR, 'usage-stats.json');
+        const content = await fs.readFile(statsPath, 'utf-8');
+        const stats = JSON.parse(content);
+        return Object.values(stats);
+    } catch (error) {
+        return [];
+    }
+}
+
+// Export the recordModelUsage function for use in the API routes
+export { recordModelUsage, ModelUsageEvent, ModelUsageStats }; 
