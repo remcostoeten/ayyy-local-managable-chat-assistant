@@ -72,25 +72,17 @@ export const navigation = {
     },
     {
       title: "Settings",
-      url: "#",
+      url: "/admin/settings",
       icon: Settings2,
       items: [
         {
           title: "General",
-          url: "#",
+          url: "/admin/settings",
         },
         {
-          title: "Team",
-          url: "#",
-        },
-        {
-          title: "Billing",
-          url: "#",
-        },
-        {
-          title: "Limits",
-          url: "#",
-        },
+          title: "Models",
+          url: "/admin/models",
+        }
       ],
     },
   ],
