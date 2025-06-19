@@ -29,21 +29,17 @@ export const navigation = {
     },
     {
       title: "Models",
-      url: "#",
+      url: "/admin/models",
       icon: Bot,
       items: [
         {
-          title: "Genesis",
-          url: "#",
+          title: "Manage Models",
+          url: "/admin/models",
         },
         {
-          title: "Explorer",
-          url: "#",
-        },
-        {
-          title: "Quantum",
-          url: "#",
-        },
+          title: "Install New Models",
+          url: "/setup",
+        }
       ],
     },
     {
