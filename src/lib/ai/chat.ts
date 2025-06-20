@@ -1,7 +1,5 @@
 "use client";
 
-import { getRelevantContext } from './knowledge-base';
-
 interface Message {
   role: 'user' | 'assistant' | 'system';
   content: string;
@@ -13,11 +11,10 @@ export async function handleChatWithRAG(
   messages: Message[],
   query: string
 ): Promise<string> {
-  const context = await getRelevantContext(query)
-
+  // Knowledge base context removed - using basic chat without RAG for now
   const systemMessage = {
     role: 'system' as const,
-    content: `You are a helpful AI assistant. When answering questions, use the following relevant context from the knowledge base:\n\n${context}\n\nIf the context is relevant, use it to provide accurate information. If the context isn't relevant to the question, rely on your general knowledge but mention that you're not using specific context from the knowledge base.`
+    content: `You are a helpful AI assistant. Please provide accurate and helpful responses to user questions.`
   }
 
   const augmentedMessages = [

@@ -14,7 +14,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { getModelSettings, updateModelSettings } from "@/app/actions/admin"
+// import { getModelSettings, updateModelSettings } from "@/app/actions/admin" // Removed - actions deleted
 import { Loader2, AlertCircle, CheckCircle2, RefreshCw } from "lucide-react"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { MODEL_DEFAULTS, AVAILABLE_MODELS } from "@/lib/config/model-defaults"
@@ -46,6 +46,22 @@ interface ModelStatus {
 }
 
 const defaultSettings: ModelSettings = MODEL_DEFAULTS
+
+// Stub functions to replace missing admin actions
+async function getModelSettings() {
+  return {
+    success: true,
+    settings: defaultSettings,
+    error: null
+  };
+}
+
+async function updateModelSettings(settings: any) {
+  return {
+    success: false,
+    error: "Model settings update functionality not implemented yet"
+  };
+}
 
 export default function ModelSettings() {
   const [settings, setSettings] = useState<ModelSettings>(defaultSettings)
@@ -87,7 +103,7 @@ export default function ModelSettings() {
     setIsCheckingModels(true)
     try {
       const statuses: ModelStatus[] = []
-      
+
       // First get all installed models
       const response = await fetch('http://localhost:11434/api/tags')
       if (!response.ok) {
@@ -95,12 +111,12 @@ export default function ModelSettings() {
       }
       const data = await response.json()
       const installedModels = data.models || []
-      
+
       for (const model of AVAILABLE_MODELS) {
         try {
           // Check if model is installed (accounting for version tags)
-          const isInstalled = installedModels.some((m: any) => 
-            m.name.split(':')[0] === model.id || 
+          const isInstalled = installedModels.some((m: any) =>
+            m.name.split(':')[0] === model.id ||
             m.model.split(':')[0] === model.id
           )
 
@@ -144,7 +160,7 @@ export default function ModelSettings() {
           })
         }
       }
-      
+
       setModelStatus(statuses)
     } catch (error) {
       console.error('Error checking model status:', error)

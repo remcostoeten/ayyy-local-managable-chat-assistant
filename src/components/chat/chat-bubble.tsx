@@ -21,12 +21,11 @@ import { cn } from "@/lib/utils";
 import Link from "next/link";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Card } from "@/components/ui/card";
-import { getChatAssistantSettings } from "@/lib/utils";
 import { AssistantResponse } from "ai";
 import { featureFlags, assistantDefaults, isDevelopment } from "@/lib/config/environment";
 
-const LOADING_MESSAGES = isDevelopment 
-  ? assistantDefaults.development.loadingMessages 
+const LOADING_MESSAGES = isDevelopment
+  ? assistantDefaults.development.loadingMessages
   : ["Assistant is typing..."];
 
 type TChatBubbleHandle = {
@@ -51,10 +50,10 @@ type TChatAssistantSettings = {
   avatar: string;
 }
 
-const ChatBubble = forwardRef<TChatBubbleHandle, TChatBubbleProps>(({ 
-  isWidget = true, 
-  role, 
-  avatar, 
+const ChatBubble = forwardRef<TChatBubbleHandle, TChatBubbleProps>(({
+  isWidget = true,
+  role,
+  avatar,
 }, ref) => {
   const [isOpen, setIsOpen] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -176,7 +175,7 @@ const ChatBubble = forwardRef<TChatBubbleHandle, TChatBubbleProps>(({
       role: "user" as const,
       content: input,
     };
-    
+
     setMessages((prev) => [...prev, userMessage]);
     setInput("");
     setIsLoading(true);
@@ -288,7 +287,7 @@ const ChatBubble = forwardRef<TChatBubbleHandle, TChatBubbleProps>(({
   const isAssistant = role === "assistant";
 
   function getEasterEggDescription(assistantName: string) {
-    const settings = isDevelopment 
+    const settings = isDevelopment
       ? assistantDefaults.development
       : assistantDefaults.production;
 
@@ -296,26 +295,15 @@ const ChatBubble = forwardRef<TChatBubbleHandle, TChatBubbleProps>(({
     if (randomNumber > settings.easterEggPercentage) {
       return `${assistantName} is ${assistantSettings.status}`;
     }
-    
+
     const messages = settings.loadingMessages;
     const randomMessage = messages[Math.floor(Math.random() * messages.length)];
     return randomMessage.text;
   }
 
   useEffect(() => {
-    const loadAssistantSettings = async () => {
-      const result = await getChatAssistantSettings();
-      if (result.success && result.settings) {
-        setAssistantSettings({
-          id: result.settings.id || "",
-          name: result.settings.name || (isDevelopment ? assistantDefaults.development.name : assistantDefaults.production.name),
-          description: getEasterEggDescription(result.settings.name || assistantSettings.name),
-          status: result.settings.status || (isDevelopment ? assistantDefaults.development.defaultStatus : assistantDefaults.production.defaultStatus),
-          avatar: result.settings.avatar || ""
-        });
-      }
-    };
-    loadAssistantSettings();
+    // Assistant settings are now handled by default values
+    // No need to fetch from API since the endpoint was removed
   }, []);
 
   return (
@@ -334,11 +322,10 @@ const ChatBubble = forwardRef<TChatBubbleHandle, TChatBubbleProps>(({
           )}
           <div
             ref={chatBubbleRef}
-            className={`fixed z-50 ${
-              isFullscreen
-                ? "inset-0 p-4 flex items-center justify-center"
-                : "bottom-4 right-4"
-            }`}
+            className={`fixed z-50 ${isFullscreen
+              ? "inset-0 p-4 flex items-center justify-center"
+              : "bottom-4 right-4"
+              }`}
           >
             <AnimatePresence>
               {isOpen ? (
@@ -366,8 +353,8 @@ const ChatBubble = forwardRef<TChatBubbleHandle, TChatBubbleProps>(({
                           <div className={cn(
                             "absolute -bottom-1 -right-1 w-4 h-4 rounded-full border-2 border-white",
                             assistantSettings.status === "active" ? "bg-green-500" :
-                            assistantSettings.status === "away" ? "bg-yellow-500" :
-                            "bg-gray-500"
+                              assistantSettings.status === "away" ? "bg-yellow-500" :
+                                "bg-gray-500"
                           )} />
                         </div>
                         <div className="flex flex-col">
@@ -483,8 +470,8 @@ const ChatBubble = forwardRef<TChatBubbleHandle, TChatBubbleProps>(({
 
                               <Card className={cn(
                                 "p-3 text-sm shadow-sm",
-                                message.role === "user" 
-                                  ? "bg-primary text-primary-foreground rounded-tl-none" 
+                                message.role === "user"
+                                  ? "bg-primary text-primary-foreground rounded-tl-none"
                                   : "bg-muted rounded-tr-none"
                               )}>
                                 <div className="whitespace-pre-wrap break-words">
@@ -570,8 +557,8 @@ const ChatBubble = forwardRef<TChatBubbleHandle, TChatBubbleProps>(({
                         className="flex-1 bg-background/10 border-background/20 text-foreground placeholder:text-muted-foreground"
                         disabled={isLoading}
                       />
-                      <Button 
-                        onClick={handleSend} 
+                      <Button
+                        onClick={handleSend}
                         disabled={isLoading}
                         className="bg-primary text-primary-foreground"
                       >
@@ -628,8 +615,8 @@ const ChatBubble = forwardRef<TChatBubbleHandle, TChatBubbleProps>(({
 
                   <Card className={cn(
                     "p-3 text-sm shadow-sm",
-                    message.role === "user" 
-                      ? "bg-primary text-primary-foreground rounded-tl-none" 
+                    message.role === "user"
+                      ? "bg-primary text-primary-foreground rounded-tl-none"
                       : "bg-muted rounded-tr-none"
                   )}>
                     <div className="whitespace-pre-wrap break-words">

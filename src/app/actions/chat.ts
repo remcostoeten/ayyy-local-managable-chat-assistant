@@ -1,9 +1,14 @@
 "use server"
 
 import { db } from "@/lib/db/client"
-import { chatSessions, chatMessages, suggestions, chatSessionMetadata } from "@/lib/db/schema"
-import { generateAIResponse, generateSuggestions } from "@/lib/ai"
+import { chatSessions, chatMessages, chatSessionMetadata } from "@/lib/db/schema"
 import { eq, desc, and } from "drizzle-orm"
+
+// Simple AI response function since the main AI module was removed
+async function generateAIResponse(message: string, history: any[]): Promise<string> {
+  // For now, return a simple response - this can be enhanced later
+  return `I received your message: "${message}". This is a placeholder response while the AI system is being configured.`;
+}
 
 export type ChatSessionResponse = {
   success: boolean
@@ -114,17 +119,18 @@ export async function sendMessage(sessionId: string, message: string, userId: st
 
 export async function getSuggestionsForChat(): Promise<ChatSuggestionsResponse> {
   try {
-    // Fetch suggestions from the database
-    const dbSuggestions = await db
-      .select({
-        text: suggestions.text
-      })
-      .from(suggestions)
-      .limit(5);
+    // Return hardcoded suggestions since the suggestions table was removed
+    const defaultSuggestions = [
+      "How can I get started?",
+      "What are the popular features?",
+      "How do I configure the models?",
+      "What are the system requirements?",
+      "How do I troubleshoot issues?"
+    ];
 
     return {
       success: true,
-      suggestions: dbSuggestions.map(s => s.text)
+      suggestions: defaultSuggestions
     }
   } catch (error) {
     console.error("Error getting suggestions:", error)
